@@ -241,7 +241,39 @@
   table.registro .go{
     cursor:pointer;color:var(--maroon);text-decoration:underline;
   }
+  .block-title{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.62rem;letter-spacing:1px;color:var(--maroon);
+    margin-bottom:4px;text-align:center;width:100%;
+  }
   .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .table-scroll{overflow-x:auto;}
+
+  /* ---- Ajustes para celular ---- */
+  @media(max-width:680px){
+    body{padding:16px 10px 60px;}
+    header.top{flex-direction:column;align-items:flex-start;}
+    .meta-inputs{width:100%;}
+    .meta-inputs label{flex:1 1 auto;}
+    .meta-inputs input{min-width:0;width:100%;}
+
+    .stats-bar{gap:8px 14px;font-size:.72rem;}
+    .stats-bar > span:last-child{margin-left:0;width:100%;flex-wrap:wrap;}
+
+    .auditorio{padding:20px 10px 16px;}
+    .screen{width:92%;height:32px;font-size:.6rem;letter-spacing:1px;margin-bottom:10px;}
+    .estrado{width:96%;margin:0 auto 54px;min-height:56px;}
+    .atril{width:24px;height:32px;right:10%;bottom:-20px;}
+    .atril::after{font-size:.5rem;}
+
+    .seating{flex-direction:column;align-items:center;gap:26px;}
+    .block .colheads{grid-template-columns:repeat(3,84px);gap:6px;}
+    .grid{grid-template-columns:repeat(3,84px);gap:6px;}
+    .seat{width:84px;height:30px;font-size:.62rem;padding:0 6px;}
+    .rownums span{height:30px;width:14px;font-size:.55rem;}
+
+    .panel{padding:14px;}
+  }
 </style>
 </head>
 <body>
@@ -333,12 +365,14 @@
       </div>
       <div id="registroWrap">
         <p class="empty-state" id="registroEmpty">Aún no hay butacas registradas.</p>
+        <div class="table-scroll">
         <table class="registro" id="registroTable" style="display:none;">
           <thead>
             <tr><th>Butaca</th><th>Nombre</th><th>Cargo</th><th>Institución</th></tr>
           </thead>
           <tbody id="registroBody"></tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
@@ -435,6 +469,11 @@
     BLOCKS.forEach(b => {
       const blockEl = document.createElement('div');
       blockEl.className = 'block';
+
+      const title = document.createElement('div');
+      title.className = 'block-title';
+      title.textContent = b.label;
+      blockEl.appendChild(title);
 
       const heads = document.createElement('div');
       heads.className = 'colheads';
