@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Auditorio — Registro de Asistentes</title>
+<style>
+  :root{
+    --ink:#1B2A44;
+    --ink-soft:#3C4A63;
+    --paper:#F6F4EF;
+    --paper-panel:#FFFFFF;
+    --line:#D8D3C7;
+    --wood:#C9AE86;
+    --wood-dark:#A98A5B;
+    --maroon:#7A2E33;
+    --maroon-soft:#F1DEDD;
+    --gold:#B08D57;
+    --seat-empty:#EDEAE2;
+    --seat-empty-border:#BDB6A4;
+    --seat-fill:#7A2E33;
+    --seat-fill-text:#F6F4EF;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:28px 16px 80px;
+  }
+  h1,h2,h3{font-weight:600;margin:0;}
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header.top{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:28px;
+  }
+  header.top .titles h1{font-size:1.5rem;letter-spacing:.2px;}
+  header.top .titles .sub{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.85rem;color:var(--ink-soft);margin-top:4px;
+  }
+  .meta-inputs{
+    display:flex;gap:10px;flex-wrap:wrap;
+    font-family:"Helvetica Neue",Arial,sans-serif;
+  }
+  .meta-inputs label{
+    display:flex;flex-direction:column;font-size:.68rem;color:var(--ink-soft);gap:3px;
+  }
+  .meta-inputs input{
+    font-family:inherit;font-size:.85rem;padding:5px 8px;
+    border:1px solid var(--line);border-radius:4px;background:var(--paper-panel);color:var(--ink);
+    min-width:200px;
+  }
+
+  .stats-bar{
+    display:flex;gap:22px;flex-wrap:wrap;align-items:center;
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.82rem;color:var(--ink-soft);
+    margin-bottom:22px;
+  }
+  .stats-bar strong{color:var(--ink);font-size:.95rem;}
+  .stats-bar .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .dot.empty{background:var(--seat-empty);border:1px solid var(--seat-empty-border);}
+  .dot.fill{background:var(--seat-fill);}
+  .btn{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    border:1px solid var(--ink);background:var(--paper-panel);color:var(--ink);
+    padding:7px 14px;border-radius:4px;font-size:.8rem;cursor:pointer;
+  }
+  .btn:hover{background:var(--ink);color:var(--paper);}
+  .btn.primary{background:var(--maroon);border-color:var(--maroon);color:#fff;}
+  .btn.primary:hover{background:#5f2327;}
+  .btn.ghost{border-color:var(--line);color:var(--ink-soft);}
+  .btn.ghost:hover{background:var(--line);color:var(--ink);}
+
+  /* ---- Auditorio visual ---- */
+  .auditorio{
+    background:var(--paper-panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:34px 28px 26px;
+    margin-bottom:26px;
+  }
+
+  .screen{
+    width:62%;
+    margin:0 auto 14px;
+    height:46px;
+    background:linear-gradient(180deg,#243654,var(--ink));
+    clip-path:polygon(6% 0,94% 0,100% 100%,0% 100%);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--paper);
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    letter-spacing:2px;font-size:.7rem;
+  }
+
+  .estrado{
+    width:74%;
+    margin:0 auto 46px;
+    min-height:78px;
+    background:linear-gradient(180deg,var(--wood),var(--wood-dark));
+    border:1px solid var(--wood-dark);
+    border-radius:4px;
+    position:relative;
+    box-shadow:inset 0 -6px 10px rgba(0,0,0,.12);
+  }
+  .estrado .label{
+    position:absolute;top:6px;left:14px;
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.62rem;letter-spacing:1.5px;color:#4A3A22;opacity:.75;
+  }
+  .atril{
+    width:34px;height:44px;
+    background:var(--ink);
+    border-radius:3px 3px 0 0;
+    position:absolute;
+    right:16%;
+    bottom:-26px;
+    box-shadow:0 3px 5px rgba(0,0,0,.25);
+  }
+  .atril::before{
+    content:"";position:absolute;top:-8px;left:-4px;right:-4px;height:10px;
+    background:var(--ink-soft);border-radius:3px;transform:skewY(-6deg);
+  }
+  .atril::after{
+    content:"ATRIL";position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.55rem;letter-spacing:1px;color:#4A3A22;opacity:.8;white-space:nowrap;
+  }
+
+  .seating{
+    display:flex;justify-content:center;gap:60px;
+    padding-top:6px;
+  }
+  .block{
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .block .colheads{
+    display:grid;grid-template-columns:repeat(3,minmax(34px,1fr));gap:6px;
+    margin-bottom:6px;width:100%;
+  }
+  .block .colheads span{
+    text-align:center;font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.6rem;color:var(--ink-soft);letter-spacing:.5px;
+  }
+  .block-inner{display:flex;align-items:flex-start;gap:8px;}
+  .rownums{
+    display:flex;flex-direction:column;gap:6px;padding-top:2px;
+  }
+  .rownums span{
+    height:26px;display:flex;align-items:center;justify-content:center;
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.6rem;color:var(--ink-soft);width:16px;
+  }
+  .grid{
+    display:grid;grid-template-columns:repeat(3,26px);gap:6px;
+  }
+  .seat{
+    width:26px;height:26px;
+    border-radius:5px 5px 3px 3px;
+    border:1px solid var(--seat-empty-border);
+    background:var(--seat-empty);
+    cursor:pointer;
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.55rem;color:var(--ink-soft);
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .1s ease;
+    padding:0;
+  }
+  .seat:hover{transform:translateY(-2px);border-color:var(--ink);}
+  .seat.filled{
+    background:var(--seat-fill);border-color:#5f2327;color:var(--seat-fill-text);
+  }
+  .seat.selected{outline:2px solid var(--gold);outline-offset:1px;}
+
+  .aisle-label{
+    text-align:center;font-family:"Helvetica Neue",Arial,sans-serif;
+    font-size:.6rem;color:var(--ink-soft);letter-spacing:1px;margin-top:10px;opacity:.7;
+  }
+
+  /* ---- Panel lateral / formulario ---- */
+  .lower{
+    display:grid;grid-template-columns:340px 1fr;gap:22px;
+  }
+  @media(max-width:820px){.lower{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--paper-panel);border:1px solid var(--line);border-radius:10px;
+    padding:20px;
+  }
+  .panel h2{font-size:1rem;margin-bottom:4px;}
+  .panel .seat-tag{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);
+    margin-bottom:16px;
+  }
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block;font-family:"Helvetica Neue",Arial,sans-serif;font-size:.72rem;
+    color:var(--ink-soft);margin-bottom:4px;
+  }
+  .field input{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:4px;
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.88rem;color:var(--ink);
+    background:var(--paper);
+  }
+  .field input:focus{outline:1.5px solid var(--ink);}
+  .panel .actions{display:flex;gap:8px;margin-top:16px;}
+  .empty-state{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.82rem;color:var(--ink-soft);
+    line-height:1.5;
+  }
+
+  table.registro{
+    width:100%;border-collapse:collapse;
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.8rem;
+  }
+  table.registro th{
+    text-align:left;font-size:.65rem;letter-spacing:.5px;color:var(--ink-soft);
+    border-bottom:1px solid var(--ink);padding:0 8px 8px;
+  }
+  table.registro td{
+    padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top;
+  }
+  table.registro tr:hover td{background:#FAF8F4;}
+  table.registro .go{
+    cursor:pointer;color:var(--maroon);text-decoration:underline;
+  }
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="titles">
+      <h1 id="tituloEvento">30° Aniversario de la Defensoría del Pueblo</h1>
+      <div class="sub" id="subEvento">Auditorio Jorge Santistevan de Noriega — miércoles, 9 de setiembre de 2026</div>
+    </div>
+    <div class="meta-inputs">
+      <label>Nombre del evento
+        <input type="text" id="inpTitulo" placeholder="Nombre del evento">
+      </label>
+      <label>Lugar / fecha
+        <input type="text" id="inpSub" placeholder="Lugar y fecha">
+      </label>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <span><span class="dot fill"></span>Ocupadas: <strong id="statOcup">0</strong></span>
+    <span><span class="dot empty"></span>Libres: <strong id="statLibre">72</strong></span>
+    <span>Total: <strong>72</strong> butacas (2 bloques × 3 columnas × 12 filas)</span>
+    <span style="margin-left:auto;display:flex;gap:8px;">
+      <button class="btn ghost" id="btnLimpiarTodo">Vaciar todas</button>
+      <button class="btn primary" id="btnExportar">Exportar registro (CSV)</button>
+    </span>
+  </div>
+
+  <div class="auditorio">
+    <div class="screen">PANTALLA</div>
+    <div class="estrado">
+      <span class="label">ESTRADO</span>
+      <div class="atril"></div>
+    </div>
+
+    <div class="seating" id="seating"></div>
+    <div class="aisle-label">↑ orientación hacia el estrado — fila 1 = más cercana</div>
+  </div>
+
+  <div class="lower">
+    <div class="panel" id="formPanel">
+      <div id="formEmpty" class="empty-state">
+        Selecciona una butaca en el mapa para registrar o editar a la persona que se sentará ahí.
+      </div>
+      <div id="formContent" style="display:none;">
+        <h2 id="formSeatLabel">Butaca</h2>
+        <div class="seat-tag" id="formSeatTag"></div>
+        <div class="field">
+          <label for="fNombre">Nombre completo</label>
+          <input type="text" id="fNombre" placeholder="Ej. Juan Pérez Ramos">
+        </div>
+        <div class="field">
+          <label for="fCargo">Cargo</label>
+          <input type="text" id="fCargo" placeholder="Ej. Comisionado(a)">
+        </div>
+        <div class="field">
+          <label for="fInstitucion">Institución</label>
+          <input type="text" id="fInstitucion" placeholder="Ej. Defensoría del Pueblo">
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnGuardar">Guardar</button>
+          <button class="btn ghost" id="btnVaciar">Vaciar butaca</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Registro ordenado</h2>
+      </div>
+      <div id="registroWrap">
+        <p class="empty-state" id="registroEmpty">Aún no hay butacas registradas.</p>
+        <table class="registro" id="registroTable" style="display:none;">
+          <thead>
+            <tr><th>Butaca</th><th>Nombre</th><th>Cargo</th><th>Institución</th></tr>
+          </thead>
+          <tbody id="registroBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const ROWS = 12, COLS = 3;
+  const BLOCKS = [
+    {key:'IZQ', label:'Bloque Izquierdo'},
+    {key:'DER', label:'Bloque Derecho'}
+  ];
+  const STORAGE_KEY = 'auditorio-seats-v1';
+  const META_KEY = 'auditorio-meta-v1';
+
+  let seats = {};   // { "IZQ-2-5": {nombre,cargo,institucion} }
+  let meta = {};
+  let selectedSeat = null;
+
+  const $ = (sel) => document.querySelector(sel);
+
+  // Almacenamiento local del navegador: los datos quedan guardados en este
+  // mismo archivo/equipo aunque se cierre la pestaña. Si varias personas
+  // usan copias distintas del archivo, cada una guarda su propio registro.
+  async function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      seats = raw ? JSON.parse(raw) : {};
+    }catch(e){ seats = {}; }
+    try{
+      const raw2 = localStorage.getItem(META_KEY);
+      meta = raw2 ? JSON.parse(raw2) : {};
+    }catch(e){ meta = {}; }
+  }
+
+  async function saveSeats(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seats));
+    }catch(e){ /* almacenamiento no disponible; los datos solo duran la sesión */ }
+  }
+  async function saveMeta(){
+    try{
+      localStorage.setItem(META_KEY, JSON.stringify(meta));
+    }catch(e){ /* ignore */ }
+  }
+
+  function seatLabel(block, col, row){
+    const side = block === 'IZQ' ? 'Izquierda' : 'Derecha';
+    return `${side} · Columna ${col} · Fila ${row}`;
+  }
+
+  function buildSeating(){
+    const container = $('#seating');
+    container.innerHTML = '';
+    BLOCKS.forEach(b => {
+      const blockEl = document.createElement('div');
+      blockEl.className = 'block';
+
+      const heads = document.createElement('div');
+      heads.className = 'colheads';
+      for(let c=1;c<=COLS;c++){
+        const s = document.createElement('span');
+        s.textContent = 'C' + c;
+        heads.appendChild(s);
+      }
+      blockEl.appendChild(heads);
+
+      const inner = document.createElement('div');
+      inner.className = 'block-inner';
+
+      const rownums = document.createElement('div');
+      rownums.className = 'rownums';
+      for(let r=1;r<=ROWS;r++){
+        const s = document.createElement('span');
+        s.textContent = r;
+        rownums.appendChild(s);
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for(let r=1;r<=ROWS;r++){
+        for(let c=1;c<=COLS;c++){
+          const id = `${b.key}-${c}-${r}`;
+          const btn = document.createElement('button');
+          btn.className = 'seat';
+          btn.dataset.id = id;
+          btn.title = seatLabel(b.key, c, r);
+          btn.addEventListener('click', () => selectSeat(id, b.key, c, r));
+          grid.appendChild(btn);
+        }
+      }
+
+      if(b.key === 'IZQ'){
+        inner.appendChild(grid);
+        inner.appendChild(rownums);
+      } else {
+        inner.appendChild(rownums);
+        inner.appendChild(grid);
+      }
+      blockEl.appendChild(inner);
+      container.appendChild(blockEl);
+    });
+  }
+
+  function refreshSeatVisuals(){
+    document.querySelectorAll('.seat').forEach(btn => {
+      const id = btn.dataset.id;
+      const data = seats[id];
+      btn.classList.toggle('filled', !!data);
+      btn.classList.toggle('selected', id === selectedSeat);
+      btn.textContent = data && data.nombre ? initials(data.nombre) : '';
+    });
+    updateStats();
+    renderRegistro();
+  }
+
+  function initials(name){
+    return name.trim().split(/\s+/).slice(0,2).map(w => w[0] ? w[0].toUpperCase() : '').join('');
+  }
+
+  function updateStats(){
+    const ocup = Object.keys(seats).length;
+    $('#statOcup').textContent = ocup;
+    $('#statLibre').textContent = (ROWS*COLS*BLOCKS.length) - ocup;
+  }
+
+  function selectSeat(id, block, col, row){
+    selectedSeat = id;
+    $('#formEmpty').style.display = 'none';
+    $('#formContent').style.display = 'block';
+    $('#formSeatLabel').textContent = `Butaca ${col}-${row}`;
+    $('#formSeatTag').textContent = seatLabel(block, col, row);
+    const data = seats[id] || {};
+    $('#fNombre').value = data.nombre || '';
+    $('#fCargo').value = data.cargo || '';
+    $('#fInstitucion').value = data.institucion || '';
+    refreshSeatVisuals();
+    $('#fNombre').focus();
+  }
+
+  async function guardarSeat(){
+    if(!selectedSeat) return;
+    const nombre = $('#fNombre').value.trim();
+    const cargo = $('#fCargo').value.trim();
+    const institucion = $('#fInstitucion').value.trim();
+    if(!nombre && !cargo && !institucion){
+      delete seats[selectedSeat];
+    } else {
+      seats[selectedSeat] = {nombre, cargo, institucion};
+    }
+    await saveSeats();
+    refreshSeatVisuals();
+  }
+
+  async function vaciarSeat(){
+    if(!selectedSeat) return;
+    delete seats[selectedSeat];
+    $('#fNombre').value = '';
+    $('#fCargo').value = '';
+    $('#fInstitucion').value = '';
+    await saveSeats();
+    refreshSeatVisuals();
+  }
+
+  async function vaciarTodo(){
+    if(!confirm('¿Vaciar el registro completo de las 72 butacas?')) return;
+    seats = {};
+    selectedSeat = null;
+    $('#formEmpty').style.display = 'block';
+    $('#formContent').style.display = 'none';
+    await saveSeats();
+    refreshSeatVisuals();
+  }
+
+  function seatSortKey(id){
+    const [block, col, row] = id.split('-');
+    return (block === 'IZQ' ? 0 : 1) * 1000 + parseInt(row)*10 + parseInt(col);
+  }
+
+  function renderRegistro(){
+    const ids = Object.keys(seats).sort((a,b) => seatSortKey(a) - seatSortKey(b));
+    if(ids.length === 0){
+      $('#registroEmpty').style.display = 'block';
+      $('#registroTable').style.display = 'none';
+      return;
+    }
+    $('#registroEmpty').style.display = 'none';
+    $('#registroTable').style.display = 'table';
+    const body = $('#registroBody');
+    body.innerHTML = '';
+    ids.forEach(id => {
+      const [block, col, row] = id.split('-');
+      const d = seats[id];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="go" data-id="${id}">${block === 'IZQ' ? 'Izq' : 'Der'} C${col}-F${row}</td>
+        <td>${escapeHtml(d.nombre||'')}</td>
+        <td>${escapeHtml(d.cargo||'')}</td>
+        <td>${escapeHtml(d.institucion||'')}</td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.go').forEach(td => {
+      td.addEventListener('click', () => {
+        const [block, col, row] = td.dataset.id.split('-');
+        selectSeat(td.dataset.id, block, parseInt(col), parseInt(row));
+      });
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function exportarCSV(){
+    const ids = Object.keys(seats).sort((a,b) => seatSortKey(a) - seatSortKey(b));
+    const rows = [['Bloque','Columna','Fila','Nombre','Cargo','Institucion']];
+    ids.forEach(id => {
+      const [block, col, row] = id.split('-');
+      const d = seats[id];
+      rows.push([block === 'IZQ' ? 'Izquierda' : 'Derecha', col, row, d.nombre||'', d.cargo||'', d.institucion||'']);
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'registro-butacas.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function applyMeta(){
+    const titulo = meta.titulo || $('#tituloEvento').textContent;
+    const sub = meta.sub || $('#subEvento').textContent;
+    $('#tituloEvento').textContent = titulo;
+    $('#subEvento').textContent = sub;
+    $('#inpTitulo').value = titulo;
+    $('#inpSub').value = sub;
+  }
+
+  async function init(){
+    buildSeating();
+    await loadData();
+    applyMeta();
+    refreshSeatVisuals();
+
+    $('#btnGuardar').addEventListener('click', guardarSeat);
+    $('#btnVaciar').addEventListener('click', vaciarSeat);
+    $('#btnLimpiarTodo').addEventListener('click', vaciarTodo);
+    $('#btnExportar').addEventListener('click', exportarCSV);
+
+    let metaTimer;
+    function onMetaChange(){
+      clearTimeout(metaTimer);
+      metaTimer = setTimeout(async () => {
+        meta.titulo = $('#inpTitulo').value.trim() || $('#tituloEvento').textContent;
+        meta.sub = $('#inpSub').value.trim() || $('#subEvento').textContent;
+        $('#tituloEvento').textContent = meta.titulo;
+        $('#subEvento').textContent = meta.sub;
+        await saveMeta();
+      }, 400);
+    }
+    $('#inpTitulo').addEventListener('input', onMetaChange);
+    $('#inpSub').addEventListener('input', onMetaChange);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
