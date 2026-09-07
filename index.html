@@ -89,7 +89,14 @@
     border-radius:10px;
     padding:34px 28px 26px;
     margin-bottom:26px;
+    overflow-x:auto;
   }
+  .mode-banner{
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:.78rem;
+    padding:9px 14px;border-radius:6px;margin-bottom:16px;
+  }
+  .mode-banner.view{background:var(--maroon-soft);color:var(--maroon);}
+  .mode-banner.edit{background:#EAF0E6;color:#3E5C33;}
 
   .screen{
     width:62%;
@@ -144,7 +151,7 @@
     display:flex;flex-direction:column;align-items:center;
   }
   .block .colheads{
-    display:grid;grid-template-columns:repeat(3,minmax(34px,1fr));gap:6px;
+    display:grid;grid-template-columns:repeat(3,104px);gap:8px;
     margin-bottom:6px;width:100%;
   }
   .block .colheads span{
@@ -153,26 +160,27 @@
   }
   .block-inner{display:flex;align-items:flex-start;gap:8px;}
   .rownums{
-    display:flex;flex-direction:column;gap:6px;padding-top:2px;
+    display:flex;flex-direction:column;gap:8px;padding-top:2px;
   }
   .rownums span{
-    height:26px;display:flex;align-items:center;justify-content:center;
+    height:32px;display:flex;align-items:center;justify-content:center;
     font-family:"Helvetica Neue",Arial,sans-serif;font-size:.6rem;color:var(--ink-soft);width:16px;
   }
   .grid{
-    display:grid;grid-template-columns:repeat(3,26px);gap:6px;
+    display:grid;grid-template-columns:repeat(3,104px);gap:8px;
   }
   .seat{
-    width:26px;height:26px;
+    width:104px;height:32px;
     border-radius:5px 5px 3px 3px;
     border:1px solid var(--seat-empty-border);
     background:var(--seat-empty);
     cursor:pointer;
     font-family:"Helvetica Neue",Arial,sans-serif;
-    font-size:.55rem;color:var(--ink-soft);
-    display:flex;align-items:center;justify-content:center;
+    font-size:.66rem;color:var(--ink-soft);
+    display:flex;align-items:center;justify-content:flex-start;
     transition:transform .1s ease;
-    padding:0;
+    padding:0 8px;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   }
   .seat:hover{transform:translateY(-2px);border-color:var(--ink);}
   .seat.filled{
@@ -211,6 +219,7 @@
     background:var(--paper);
   }
   .field input:focus{outline:1.5px solid var(--ink);}
+  .field input:read-only{background:#F0EEE9;color:var(--ink-soft);}
   .panel .actions{display:flex;gap:8px;margin-top:16px;}
   .empty-state{
     font-family:"Helvetica Neue",Arial,sans-serif;font-size:.82rem;color:var(--ink-soft);
@@ -252,6 +261,23 @@
       </label>
     </div>
   </header>
+
+  <div id="bannerStatus" class="mode-banner view" style="display:none;"></div>
+
+  <div id="setupPanel" class="panel" style="display:none;margin-bottom:22px;border-color:var(--maroon);">
+    <h2 style="margin-bottom:10px;">Falta un paso: conectar tu Google Sheet</h2>
+    <p class="empty-state">
+      Para que todos registren en el mismo lugar y tú lo veas al actualizar, este archivo necesita conectarse a una Hoja de cálculo de Google. Es un solo paso, una sola vez:
+    </p>
+    <ol class="empty-state" style="padding-left:18px;">
+      <li>Crea una Hoja de cálculo de Google nueva y, en la fila 1, escribe: <code>SeatID</code>, <code>Nombre</code>, <code>Cargo</code>, <code>Institucion</code>.</li>
+      <li>Ve a <strong>Extensiones → Apps Script</strong> y pega el código que te compartieron junto con este archivo. Guarda.</li>
+      <li>Haz clic en <strong>Implementar → Nueva implementación</strong>, tipo <strong>Aplicación web</strong>. En "Ejecutar como" deja tu cuenta, y en "Quién tiene acceso" elige <strong>Cualquier usuario</strong>. Implementa y autoriza los permisos.</li>
+      <li>Copia la URL de la aplicación web que te entrega (termina en <code>/exec</code>).</li>
+      <li>Abre este archivo HTML en un editor de texto, busca <code>SHEET_API_URL</code> cerca del final y pega ahí esa URL. Guarda y vuelve a subirlo a tu repositorio.</li>
+    </ol>
+    <p class="empty-state">Mientras tanto, el mapa funciona pero cada quien ve solo lo que registra en su propio equipo.</p>
+  </div>
 
   <div class="stats-bar">
     <span><span class="dot fill"></span>Ocupadas: <strong id="statOcup">0</strong></span>
@@ -326,8 +352,13 @@
     {key:'IZQ', label:'Bloque Izquierdo'},
     {key:'DER', label:'Bloque Derecho'}
   ];
-  const STORAGE_KEY = 'auditorio-seats-v1';
-  const META_KEY = 'auditorio-meta-v1';
+  // ======= CONEXIÓN A GOOGLE SHEETS =======
+  // Pega aquí la URL de tu aplicación web de Apps Script (termina en /exec).
+  // Mientras diga "PEGA_AQUI...", el registro no se comparte y cada quien
+  // ve solo lo que registra en su propio equipo.
+  const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbzHzUpkVJzakSbgiZU_h9bZTyTEwiWTSU70mpP8lmAaCdqOOTOv1v-ZygrzukFhfcbKVg/exec";
+  const POLL_MS = 8000; // cada cuánto se revisa si hay cambios nuevos
+  // ==========================================
 
   let seats = {};   // { "IZQ-2-5": {nombre,cargo,institucion} }
   let meta = {};
@@ -335,29 +366,62 @@
 
   const $ = (sel) => document.querySelector(sel);
 
-  // Almacenamiento local del navegador: los datos quedan guardados en este
-  // mismo archivo/equipo aunque se cierre la pestaña. Si varias personas
-  // usan copias distintas del archivo, cada una guarda su propio registro.
-  async function loadData(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      seats = raw ? JSON.parse(raw) : {};
-    }catch(e){ seats = {}; }
-    try{
-      const raw2 = localStorage.getItem(META_KEY);
-      meta = raw2 ? JSON.parse(raw2) : {};
-    }catch(e){ meta = {}; }
+  function isConfigured(){
+    return SHEET_API_URL && SHEET_API_URL.indexOf('PEGA_AQUI') !== 0;
   }
 
-  async function saveSeats(){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seats));
-    }catch(e){ /* almacenamiento no disponible; los datos solo duran la sesión */ }
+  const FALLBACK_KEY = 'auditorio-fallback-v1';
+  function loadFallback(){
+    try{ const d = JSON.parse(localStorage.getItem(FALLBACK_KEY) || '{}'); seats = d.seats || {}; meta = d.meta || {}; }
+    catch(e){ seats = {}; meta = {}; }
   }
-  async function saveMeta(){
+  function saveFallback(){
+    try{ localStorage.setItem(FALLBACK_KEY, JSON.stringify({seats, meta})); }catch(e){}
+  }
+
+  function showStatus(text, kind){
+    const b = $('#bannerStatus');
+    b.textContent = text;
+    b.className = 'mode-banner ' + kind;
+    b.style.display = 'block';
+  }
+
+  async function fetchAll(){
     try{
-      localStorage.setItem(META_KEY, JSON.stringify(meta));
-    }catch(e){ /* ignore */ }
+      const res = await fetch(SHEET_API_URL, {cache:'no-store'});
+      if(!res.ok) throw new Error('estado ' + res.status);
+      const data = await res.json();
+      seats = data.seats || {};
+      meta = data.meta || {};
+      showStatus('Conectado a tu Google Sheet — el registro se actualiza solo cada pocos segundos.', 'edit');
+      applyMeta();
+      refreshSeatVisuals();
+    }catch(e){
+      showStatus('No se pudo leer la hoja de cálculo. Revisa la URL configurada.', 'view');
+    }
+  }
+
+  // Content-Type "text/plain" evita que el navegador dispare una solicitud
+  // de verificación (preflight) que Apps Script no responde.
+  async function postAction(payload){
+    try{
+      await fetch(SHEET_API_URL, {
+        method: 'POST',
+        headers: {'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      });
+    }catch(e){ /* se reintentará en la próxima acción */ }
+    await fetchAll();
+  }
+
+  function initBackend(){
+    if(!isConfigured()){
+      $('#setupPanel').style.display = 'block';
+      showStatus('Sin conectar: cada quien ve solo lo que registra en su propio equipo.', 'view');
+      return;
+    }
+    fetchAll();
+    setInterval(fetchAll, POLL_MS);
   }
 
   function seatLabel(block, col, row){
@@ -422,16 +486,16 @@
     document.querySelectorAll('.seat').forEach(btn => {
       const id = btn.dataset.id;
       const data = seats[id];
+      const [block, col, row] = id.split('-');
       btn.classList.toggle('filled', !!data);
       btn.classList.toggle('selected', id === selectedSeat);
-      btn.textContent = data && data.nombre ? initials(data.nombre) : '';
+      btn.textContent = data && data.nombre ? data.nombre : '';
+      btn.title = data
+        ? `${seatLabel(block, col, row)}\n${data.nombre || ''}${data.cargo ? ' — ' + data.cargo : ''}${data.institucion ? ' — ' + data.institucion : ''}`
+        : seatLabel(block, col, row);
     });
     updateStats();
     renderRegistro();
-  }
-
-  function initials(name){
-    return name.trim().split(/\s+/).slice(0,2).map(w => w[0] ? w[0].toUpperCase() : '').join('');
   }
 
   function updateStats(){
@@ -459,33 +523,42 @@
     const nombre = $('#fNombre').value.trim();
     const cargo = $('#fCargo').value.trim();
     const institucion = $('#fInstitucion').value.trim();
-    if(!nombre && !cargo && !institucion){
-      delete seats[selectedSeat];
+    const value = (!nombre && !cargo && !institucion) ? null : {nombre, cargo, institucion};
+    if(isConfigured()){
+      await postAction({action:'setSeat', id:selectedSeat, data:value});
     } else {
-      seats[selectedSeat] = {nombre, cargo, institucion};
+      if(value === null) delete seats[selectedSeat]; else seats[selectedSeat] = value;
+      saveFallback();
+      refreshSeatVisuals();
     }
-    await saveSeats();
-    refreshSeatVisuals();
   }
 
   async function vaciarSeat(){
     if(!selectedSeat) return;
-    delete seats[selectedSeat];
     $('#fNombre').value = '';
     $('#fCargo').value = '';
     $('#fInstitucion').value = '';
-    await saveSeats();
-    refreshSeatVisuals();
+    if(isConfigured()){
+      await postAction({action:'setSeat', id:selectedSeat, data:null});
+    } else {
+      delete seats[selectedSeat];
+      saveFallback();
+      refreshSeatVisuals();
+    }
   }
 
   async function vaciarTodo(){
-    if(!confirm('¿Vaciar el registro completo de las 72 butacas?')) return;
-    seats = {};
+    if(!confirm('¿Vaciar el registro completo de las 72 butacas para TODOS?')) return;
     selectedSeat = null;
     $('#formEmpty').style.display = 'block';
     $('#formContent').style.display = 'none';
-    await saveSeats();
-    refreshSeatVisuals();
+    if(isConfigured()){
+      await postAction({action:'clearAll'});
+    } else {
+      seats = {};
+      saveFallback();
+      refreshSeatVisuals();
+    }
   }
 
   function seatSortKey(id){
@@ -559,9 +632,12 @@
 
   async function init(){
     buildSeating();
-    await loadData();
-    applyMeta();
-    refreshSeatVisuals();
+    initBackend();
+    if(!isConfigured()){
+      loadFallback();
+      applyMeta();
+      refreshSeatVisuals();
+    }
 
     $('#btnGuardar').addEventListener('click', guardarSeat);
     $('#btnVaciar').addEventListener('click', vaciarSeat);
@@ -572,11 +648,16 @@
     function onMetaChange(){
       clearTimeout(metaTimer);
       metaTimer = setTimeout(async () => {
-        meta.titulo = $('#inpTitulo').value.trim() || $('#tituloEvento').textContent;
-        meta.sub = $('#inpSub').value.trim() || $('#subEvento').textContent;
-        $('#tituloEvento').textContent = meta.titulo;
-        $('#subEvento').textContent = meta.sub;
-        await saveMeta();
+        const titulo = $('#inpTitulo').value.trim() || $('#tituloEvento').textContent;
+        const sub = $('#inpSub').value.trim() || $('#subEvento').textContent;
+        if(isConfigured()){
+          await postAction({action:'setMeta', meta:{titulo, sub}});
+        } else {
+          meta.titulo = titulo; meta.sub = sub;
+          $('#tituloEvento').textContent = titulo;
+          $('#subEvento').textContent = sub;
+          saveFallback();
+        }
       }, 400);
     }
     $('#inpTitulo').addEventListener('input', onMetaChange);
